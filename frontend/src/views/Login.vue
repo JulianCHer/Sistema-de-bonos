@@ -1,37 +1,105 @@
 <script setup>
-import bgImage from '@/assets/background1.jpg'
+import bgImage from '@/assets/login_image.jpeg'
 import { ref } from 'vue'
-import { UserIcon, LockIcon } from 'lucide-vue-next'
-const user = ref('')
+import axios from 'axios'
+import api from '../axios.js'
+import { UserIcon, LockIcon, Eye, EyeOff } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+const email = ref('')
 const password = ref('')
+const emailInput = ref(null)      
+const passwordInput = ref(null)
+const errorMessage = ref('')
+const loading = ref(false)
+const showPassword = ref(false)
+
+const handleLogin = async () => {
+  errorMessage.value = '' // limpia mensaje previo
+  loading.value = true
+
+  try {
+    const response = await api.post('/login', {
+      email: email.value,
+      password: password.value,
+    })
+
+    if (response.data.user) {
+      localStorage.setItem('token', response.data.token)
+      localStorage.setItem('user', JSON.stringify(response.data.user))
+
+      router.push('/dashboard')
+    } else {
+      errorMessage.value = 'Error: Respuesta inesperada del servidor.'
+    }
+  } catch (error) {
+    let problem = error.response.data;
+    if(error.response.status === 422){
+      if(problem.errors.email){
+        errorMessage.value = 'Ingresa un E-mail valido.'
+        emailInput.value?.focus()
+      }
+    }else if(error.response.status === 401){
+      errorMessage.value = 'Contraseña incorrecta.'
+      passwordInput.value?.focus()
+
+    }else if(error.response.status === 500){
+      errorMessage.value = 'Error de conexión.'
+      console.log(error.response);
+    }else{
+      errorMessage.value = 'Error inesperado. Intenta nuevamente'
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
 </script>
 
 <template>
   <div class="flex w-screen h-screen">
     <div
-      class="left_panel w-1/2 h-screen bg-cover bg-center rounded-tr-[25px] rounded-br-[25px] overflow-hidden shadow-[5px_0_20px_rgba(0,0,0,0.3)]"
-      :style="{ backgroundImage: `url(${bgImage})` }"></div>
+      class="left_panel w-1/2 h-screen bg-cover bg-center bg-black rounded-tr-[25px] rounded-br-[25px] overflow-hidden"
+      :style="{ backgroundImage: `url(${bgImage})` }">
+    </div>
 
     <div class="center_panel w-[15px] bg-gray-150 shadow-inner"></div>
 
     <div
-      class="right_panel w-1/2 flex flex-col items-center justify-center rounded-tl-[25px] rounded-bl-[25px] border-l border-l-[#74737326] bg-[#f3f6fb]">
+      class="right_panel w-1/2 flex flex-col items-center justify-center rounded-tl-[25px] rounded-bl-[25px] border-l border-l-[#74737326] ">
       <div class="form_container flex flex-col items-center justify-center min-h-screen shadow-lg rounded-2xl p-8 w-full">
-        <h1 class="title_right_panel text-[50px] font-montserrat font-black mb-8 text-gray-800 w-[50%] leading-tight">
-          INVERSIONES DEL META MV
-        </h1>
+        <img class="image_title w-[50%]" src="../assets/Logotipo.png"></img>
 
         <form action="#" method="post" class="flex flex-col h-[40%] w-[70%] justify-evenly">
           <div class="user mb-5">
-            <label for="email" class="block text-gray-600 text-sm mb-2">Usuario</label>
-            <input type="text" id="user" name="user" placeholder="Usuario" required
+            <label for="email" class="block text-gray-600 text-sm mb-2">Correo</label>
+            <input v-model="email" type="text" id="email" name="email" placeholder="correo" required
               class="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-gray-700" />
           </div>
 
-          <div class="password mb-5">
+          <div class="password mb-5 relative">
             <label for="password" class="block text-gray-600 text-sm mb-2">Contraseña</label>
-            <input type="password" id="password" name="password" placeholder="••••••••" required
-              class="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-gray-700" />
+            <div class="relative">
+              <input
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                id="password"
+                name="password"
+                placeholder="••••••••"
+                required
+                class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-gray-700"
+              />
+
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                :aria-pressed="showPassword.toString()"
+                class="absolute inset-y-0 right-2 flex items-center justify-center px-2"
+              >
+                <component :is="showPassword ? EyeOff : Eye" class="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
           </div>
 
           <div class="remember_container flex items-center justify-between text-sm text-gray-600 mb-6">
@@ -41,11 +109,17 @@ const password = ref('')
             </label>
             <a href="#" class="text-indigo-500 text-blue w-[50%]">Olvidaste la contraseña?</a>
           </div>
-
-          <button type="submit"
-            class="w-full bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all">
-            Ingresar
+          <button
+            type="button"
+            @click="handleLogin"
+            :disabled="loading"
+            class="w-full bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all"
+          >
+            {{ loading ? 'Verificando...' : 'Ingresar' }}
           </button>
+          <p v-if="errorMessage" class="error_message text-red-500 text-sm text-center mt-3">
+            {{ errorMessage }}
+          </p>
         </form>
       </div>
     </div>
@@ -53,9 +127,7 @@ const password = ref('')
 </template>
 
 <style scoped>
-/* =========================================================
-   🌈 TRANSICIONES GLOBALES
-   ========================================================= */
+
 .left_panel,
 .center_panel,
 .right_panel,
@@ -66,6 +138,10 @@ form {
 
 .user label,
 .password label{
+  font-weight: bold;
+}
+
+.error_message{
   font-weight: bold;
 }
 
@@ -113,6 +189,10 @@ form {
   form {
     width: 75% !important;
   }
+
+  .form_container .image_title {
+    width: 70%;
+  }
 }
 
 /* =========================================================
@@ -134,6 +214,10 @@ form {
 
   form {
     width: 80% !important;
+  }
+
+  .form_container .image_title {
+    width: 100%;
   }
 }
 
@@ -164,10 +248,8 @@ form {
   }
 
   /* Ajustes del título y formulario */
-  .form_container h1 {
-    font-size: 32px !important;
-    width: 90% !important;
-    text-align: center !important;
+  .form_container .image_title {
+    width: 50%;
   }
 
   form {
@@ -180,8 +262,8 @@ form {
    📲 CELULAR PEQUEÑO (<= 576px)
    ========================================================= */
 @media (max-width: 576px) {
-  .form_container h1 {
-    font-size: 28px !important;
+  .form_container .image_title {
+    width: 100%;
   }
 
   form {
@@ -204,9 +286,8 @@ form {
     padding: 8%;
   }
 
-  .form_container h1 {
-    font-size: 24px !important;
-    line-height: 1.2 !important;
+  .form_container .image_title {
+    width: 100%;
   }
 
   form {
