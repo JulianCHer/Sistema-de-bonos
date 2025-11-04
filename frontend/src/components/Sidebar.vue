@@ -22,7 +22,7 @@
           <li v-for="item in menu" :key="item.name">
             <div
               @click="toggleSubmenu(item)"
-              class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+              class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-[#283F69] hover:text-white"
             >
               <div class="flex items-center space-x-3">
                 <component :is="item.icon" class="w-5 h-5" />
@@ -57,58 +57,108 @@
         </ul>
       </nav>
   
-      <!-- Footer -->
-      <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <button
-          @click="$emit('toggleTheme')"
-          class="flex items-center space-x-2 p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+      <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between h-[10%]">
+        <div
+          @click="toggleMode"
+          class="relative flex items-center justify-between w-[40%] h-[80%] pl-[2%] rounded-full cursor-pointer overflow-hidden transition-all duration-500"
+          :class="darkMode ? 'bg-black text-white' : 'bg-gray-300 text-black'"
         >
-          <component :is="darkMode ? 'lucide-sun' : 'lucide-moon'" class="w-5 h-5" />
-          <span v-if="!collapsed">{{ darkMode ? 'Modo claro' : 'Modo oscuro' }}</span>
+          <div
+            class="absolute w-[30%] h-[70%] rounded-full flex items-center justify-center shadow-md transition-all duration-500"
+            :class="darkMode ? 'translate-x-13 bg-white text-black' : 'translate-x-0 bg-white text-yellow-500'"
+          >
+            <component :is="darkMode ? MoonIcon : SunIcon" class="w-[80%] h-[80%] transition-all duration-500" />
+          </div>
+        </div>
+        <button
+          @click="logout"
+          class="flex items-center rounded text-red-600 cursor-pointer"
+        >
+          <LogOut/>
+          <span v-if="!collapsed">Cerrar sesión</span>
         </button>
       </div>
     </aside>
   </template>
   
   <script setup>
-  import { ref } from 'vue'
+  import { ref, onMounted } from 'vue'
+  import { useRouter } from 'vue-router'
+  import { Sun as SunIcon, Moon as MoonIcon } from 'lucide-vue-next'
   import {
-    LayoutGrid,
-    Box,
-    ShoppingBag,
-    Wallet,
-    ChevronDown,
-    ChevronUp,
-    ChevronLeft,
-    ChevronRight,
-    Sun,
-    Moon
+    Ticket,
+    FileBadge,
+    File,
+    Users,
+    LogOut
   } from 'lucide-vue-next'
+
+  const router = useRouter()
+  const darkMode = ref(false)
   
   defineProps({
     collapsed: Boolean,
     darkMode: Boolean
   })
+
+  const toggleMode = () => {
+    darkMode.value = !darkMode.value
+    document.documentElement.classList.toggle('dark', darkMode.value)
+    localStorage.setItem('darkmode', darkMode.value ? '1' : '0')
+  }
   
   const menu = ref([
-    { name: 'Dashboard', icon: LayoutGrid },
-    {
-      name: 'Product',
-      icon: Box,
-      open: false,
-      children: [
-        { name: 'Drafts', badge: 2, badgeColor: 'red' },
-        { name: 'Released' },
-        { name: 'Comments' },
-        { name: 'Scheduled', badge: 8, badgeColor: 'green' }
-      ]
-    },
-    { name: 'Purchases', icon: ShoppingBag },
-    { name: 'Wallet', icon: Wallet }
+    { name: 'SORTEOS', icon: FileBadge },
+    { name: 'BONOS', icon: Ticket},
+    { name: 'USUARIOS', icon: Users },
+    { name: 'REPORTES', icon: File }
   ])
   
   const toggleSubmenu = (item) => {
     if (item.children) item.open = !item.open
   }
+
+  const logout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('id_group')
+    router.push('/')
+  }
+
+  onMounted(() => {
+    const savedDark = localStorage.getItem('darkmode')
+    if (savedDark === '1') {
+      darkMode.value = true
+      document.documentElement.classList.add('dark')
+    } else {
+      darkMode.value = false
+      document.documentElement.classList.remove('dark')
+    }
+    const idGroup = JSON.parse(localStorage.getItem('id_group'))
+
+    if (idGroup === 1) {
+      // 🧑‍💼 Grupo 1: administrador
+      menu.value = [
+        { name: 'SORTEOS', icon: FileBadge },
+        { name: 'BONOS', icon: Ticket },
+        { name: 'VENDEDORES', icon: Users },
+        { name: 'USUARIOS', icon: Users },
+        { name: 'REPORTES', icon: File }
+      ]
+    } else if (idGroup === 2) {
+      // 👥 Grupo 2: vendedor u otro rol
+      menu.value = [
+        { name: 'BONOS', icon: Ticket },
+        { name: 'REPORTES', icon: File },
+        { name: 'SORTEOS', icon: FileBadge }
+      ]
+    } else {
+      // Si no hay grupo o es inválido, mostrar un menú por defecto
+      menu.value = [
+        { name: 'SORTEOS', icon: FileBadge },
+        { name: 'BONOS', icon: Ticket }
+      ]
+    }
+  })
   </script>
   

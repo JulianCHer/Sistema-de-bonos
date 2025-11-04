@@ -26,8 +26,10 @@ const handleLogin = async () => {
     })
 
     if (response.data.user) {
+      console.log(response.data);
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.user))
+      localStorage.setItem('id_group', JSON.stringify(response.data.user.id_group))
 
       router.push('/dashboard')
     } else {

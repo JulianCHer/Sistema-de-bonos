@@ -17,7 +17,10 @@ class AuthController extends Controller
         ]);
 
         // 2️⃣ Buscamos el usuario en la base de datos
-        $user = DB::table('users')->where('email', $request->email)->first();
+        $user = DB::table('users')
+            ->where('email', $request->email)
+            ->where('State','Active')
+            ->first();
 
         // 3️⃣ Si no existe, devolvemos error
         if (!$user) {
@@ -29,6 +32,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Contraseña incorrecta'], 401);
         }
 
+        // Generamos un token de sesión
         $token = bin2hex(random_bytes(32));
         DB::table('users')->where('id', $user->id)->update(['remember_token' => $token]);
 
