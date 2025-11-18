@@ -20,6 +20,18 @@ const previewImage = ref(null)
 const loaderContainer = ref(null)
 let loaderAnimation = null
 const selectedUserId = ref(null)
+const deletedUsers = ref([])
+const showDeletedModal = ref(false)
+const loadingDeleted = ref(false)
+const currentPage = ref(1)
+const perPage = ref(10)
+const perPageOptions = [5, 10, 20, 50]
+const pagination = ref({
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0
+})
 
 
 const newUser = ref({
@@ -63,17 +75,68 @@ watch(
     }
 )
 
-const getUsers = async () => {
+const getUsers = async (page = currentPage.value) => {
     try {
         cargando.value = true
-        const response = await api.get('/users')
+        const response = await api.get('/users', {
+            params: {
+                page,
+                per_page: perPage.value
+            }
+        })
         users.value = response.data.users || []
+        if (response.data.pagination) {
+            pagination.value = response.data.pagination
+            currentPage.value = response.data.pagination.current_page || page
+        } else {
+            pagination.value = {
+                current_page: page,
+                last_page: 1,
+                per_page: perPage.value,
+                total: users.value.length
+            }
+            currentPage.value = page
+        }
     } catch (error) {
         console.error('Error al cargar usuarios:', error)
         Swal.fire('Error', 'No se pudieron cargar los usuarios.', 'error')
     } finally {
         cargando.value = false
     }
+}
+
+const getDeletedUsers = async () => {
+    try {
+        loadingDeleted.value = true
+        const response = await api.get('/users/erased_users')
+        deletedUsers.value = response.data.users || []
+    } catch (error) {
+        console.error('Error al cargar usuarios eliminados:', error)
+    } finally {
+        loadingDeleted.value = false
+    }
+}
+
+const abrirModalEliminados = async () => {
+    showDeletedModal.value = true
+    await getDeletedUsers()
+}
+
+const handlePerPageChange = () => {
+    getUsers(1)
+}
+
+const goToPage = (page) => {
+    if (page < 1 || page > (pagination.value.last_page || 1)) return
+    getUsers(page)
+}
+
+const nextPage = () => {
+    goToPage((currentPage.value || 1) + 1)
+}
+
+const prevPage = () => {
+    goToPage((currentPage.value || 1) - 1)
 }
 
 const handleImageUpload = (event) => {
@@ -156,11 +219,42 @@ const eliminarUsuario = async (id) => {
 
     try {
         await api.delete(`/users/${id}`)
-        users.value = users.value.filter((u) => u.id !== id)
         Swal.fire('Eliminado', 'El usuario ha sido eliminado correctamente.', 'success')
+        await getUsers(currentPage.value)
     } catch (error) {
         console.error('Error al eliminar usuario:', error)
         Swal.fire('Error', 'No se pudo eliminar el usuario.', 'error')
+    }
+}
+
+const restaurarUsuario = async (id) => {
+    const confirm = await Swal.fire({
+        title: '¿Restaurar usuario?',
+        text: 'El usuario volverá a estar activo',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, restaurar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33'
+    })
+
+    if (!confirm.isConfirmed) return
+
+    try {
+        guardando.value = true
+        await api.post(`/users/restore_users/${id}`)
+        Swal.fire('Restaurado', 'El usuario ha sido restaurado correctamente.', 'success')
+        await getUsers()
+        await getDeletedUsers()
+        if (deletedUsers.value.length === 0) {
+            showDeletedModal.value = false
+        }
+    } catch (error) {
+        console.error('Error al restaurar usuario:', error)
+        Swal.fire('Error', 'No se pudo restaurar el usuario.', 'error')
+    } finally {
+        guardando.value = false
     }
 }
 
@@ -197,7 +291,7 @@ onMounted(() => getUsers())
         </div>
     </transition>
     <transition name="fade">
-        <div v-if="New_User" class="fixed inset-0 bg-[rgba(0,0,0,0.4)] flex items-center justify-center z-50 p-[2%]"
+        <div v-if="New_User" class="fixed inset-0 bg-[rgba(0,0,0,0.8)] flex items-center justify-center z-50 p-[2%]"
         @click.self="New_User = false; resetForm()">
 
             <div class="bg-white dark:bg-gray-800 rounded-2xl w-[90%] md:w-[60%] lg:w-[45%] shadow-2xl relative p-[2%]">
@@ -294,15 +388,77 @@ onMounted(() => getUsers())
             </div>
         </div>
     </transition>
+    <transition name="fade">
+        <div v-if="showDeletedModal"
+            class="fixed inset-0 bg-[rgba(0,0,0,0.8)] flex items-center justify-center z-50 p-[2%]"
+            @click.self="showDeletedModal = false">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl w-[90%] md:w-[70%] shadow-2xl relative p-[2%]">
+
+                <h2 class="text-2xl font-bold !mb-[2%] text-center rounded-t-[10px] bg-[#283F69] p-[1%] text-white">
+                    USUARIOS ELIMINADOS
+                </h2>
+
+                <div v-if="loadingDeleted" class="text-center text-gray-500 py-6">
+                    Cargando usuarios eliminados...
+                </div>
+
+                <div v-else class="overflow-x-auto rounded-lg shadow">
+                    <table class="min-w-full border border-gray-200 bg-white text-gray">
+                        <thead class="bg-[#283F69] text-white">
+                            <tr>
+                                <th class="px-4 py-3 text-center text-[18px] !font-semibold">#</th>
+                                <th class="px-4 py-3 text-center text-[18px] !font-semibold">Nombre</th>
+                                <th class="px-4 py-3 text-center text-[18px] !font-semibold">Email</th>
+                                <th class="px-4 py-3 text-center text-[18px] !font-semibold">Teléfono</th>
+                                <th class="px-4 py-3 text-center text-[18px] !font-semibold">Documento</th>
+                                <th class="px-4 py-3 text-center text-[18px] !font-semibold">Grupo</th>
+                                <th class="px-4 py-3 text-center text-[18px] !font-semibold">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tr v-if="deletedUsers.length === 0">
+                                <td colspan="7" class="text-center py-6 text-gray-500 dark:text-gray-400">
+                                    No hay usuarios eliminados.
+                                </td>
+                            </tr>
+                            <tr v-else v-for="(user, index) in deletedUsers" :key="`deleted-${user.id}`"
+                                :class="[darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100']"
+                                class="transition">
+                                <td class="px-4 py-2 text-center">{{ index + 1 }}</td>
+                                <td class="px-4 py-2 text-center">{{ user.name }} {{ user.surname }}</td>
+                                <td class="px-4 py-2 text-center">{{ user.email }}</td>
+                                <td class="px-4 py-2 text-center">{{ user.phone }}</td>
+                                <td class="px-4 py-2 text-center">
+                                    <strong class="uppercase">{{ user.type_document }} - </strong> {{ user.document }}
+                                </td>
+                                <td class="px-4 py-2 text-center">{{ user.group_name || 'Sin grupo' }}</td>
+                                <td class="px-4 py-2 text-center">
+                                    <button
+                                        class="bg-green-600 text-white font-bold px-4 py-2 rounded hover:bg-green-700 transition"
+                                        @click="restaurarUsuario(user.id)">
+                                        Restaurar
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </transition>
 
     <div class="total_section w-[85%] py-[2%] flex flex-col align-items-center">
         <!-- 🔹 Botón Nuevo usuario -->
-        <div class="button_section flex justify-end p-[2%] w-[100%] mb-4">
+        <div class="button_section flex flex-wrap gap-3 justify-end p-[2%] w-[100%] mb-4">
             <button class="border border-[#283F69] px-4 py-2 rounded
             transition-all duration-300 ease-in-out cursor-pointer" @click="New_User = true" :class="[
                 darkMode ? 'bg-white text-[#283F69]' : 'bg-[#283F69] text-white',
             ]">
                 Nuevo Usuario
+            </button>
+            <button class="px-4 py-2 rounded bg-red-800 text-white transition-all duration-300 ease-in-out cursor-pointer"
+                @click="abrirModalEliminados" >
+                Usuarios eliminados
             </button>
         </div>
         <hr class="w-[100%] text-center opacity-10 py-[1%]" />
@@ -314,11 +470,29 @@ onMounted(() => getUsers())
                 Listado de usuarios
             </h1>
 
+            <div class="flex flex-wrap justify-between items-center !mb-4 gap-4">
+                <div class="flex items-center gap-2 text-sm">
+                    <label :class="[darkMode ? 'text-white' : 'text-[#283F69]']">Registros por página:</label>
+                    <select v-model.number="perPage" @change="handlePerPageChange"
+                        class="border border-gray-300 rounded px-3 py-2 text-sm  dark:text-white dark:bg-gray-700 dark:border-gray-600"
+                        :class="[
+                            darkMode ? 'bg-white text-black' : 'bg-white border-gray-300',
+                        ]">
+                        <option v-for="option in perPageOptions" :key="`per-page-${option}`" :value="option">
+                            {{ option }}
+                        </option>
+                    </select>
+                </div>
+                <div class="text-sm" :class="[darkMode ? 'text-white' : 'text-[#283F69]']">
+                    Página {{ pagination.current_page }} de {{ pagination.last_page }} — Total: {{ pagination.total }}
+                </div>
+            </div>
+
             <div v-if="cargando" class="text-gray-500 text-center py-10 text-lg">
                 Cargando usuarios...
             </div>
 
-            <div v-else class="overflow-x-auto rounded-lg shadow">
+            <div v-else class="overflow-x-auto rounded-lg">
                 <table class="min-w-full border border-gray-200" :class="[
                     darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray'
                 ]">
@@ -404,6 +578,23 @@ onMounted(() => getUsers())
                         </tr>
                     </tbody>
                 </table>
+                <div class="flex flex-wrap justify-between items-center !mt-4 gap-4">
+                    <span class="text-sm" :class="[darkMode ? 'text-white' : 'text-[#283F69]']">
+                        Mostrando página {{ pagination.current_page }} de {{ pagination.last_page }}
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <button @click="prevPage" :disabled="currentPage <= 1"
+                            class="px-4 py-2 border rounded transition-all"
+                            :class="[currentPage <= 1 ? 'text-gray-400 border-gray-300 cursor-not-allowed' : 'text-[#283F69] border-[#283F69] hover:bg-[#283F69] hover:text-white']">
+                            Anterior
+                        </button>
+                        <button @click="nextPage" :disabled="currentPage >= pagination.last_page"
+                            class="px-4 py-2 border rounded transition-all"
+                            :class="[currentPage >= pagination.last_page ? 'text-gray-400 border-gray-300 cursor-not-allowed' : 'text-[#283F69] border-[#283F69] hover:bg-[#283F69] hover:text-white']">
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -57,7 +57,7 @@
 
       <button
         @click="logout"
-        class="flex items-center rounded text-red-600 cursor-pointer"
+        class="flex items-center rounded text-red-600 cursor-pointer text-[12px]"
       >
         <LogOut/>
         <span>Cerrar sesión</span>
