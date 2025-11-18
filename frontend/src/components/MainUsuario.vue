@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import api from '@/axios'
 import Swal from 'sweetalert2'
 import { SquarePen, Trash2, Camera } from 'lucide-vue-next'
@@ -18,6 +18,7 @@ const guardando = ref(false)
 const editando = ref(false)
 const previewImage = ref(null)
 const loaderContainer = ref(null)
+let loaderAnimation = null
 const selectedUserId = ref(null)
 
 
@@ -34,17 +35,33 @@ const newUser = ref({
     avatar: null
 })
 
-onMounted(() => {
-    if (loaderContainer.value) {
-        lottie.loadAnimation({
-            container: loaderContainer.value,
-            renderer: 'svg',
-            loop: true,
-            autoplay: true,
-            animationData: loading
-        })
+watch(
+    () => guardando.value || cargando.value,
+    async (isLoading) => {
+        if (!isLoading) {
+            if (loaderAnimation) {
+                loaderAnimation.destroy()
+                loaderAnimation = null
+            }
+            return
+        }
+
+        await nextTick()
+
+        if (loaderContainer.value) {
+            if (loaderAnimation) {
+                loaderAnimation.destroy()
+            }
+            loaderAnimation = lottie.loadAnimation({
+                container: loaderContainer.value,
+                renderer: 'svg',
+                loop: true,
+                autoplay: true,
+                animationData: loading
+            })
+        }
     }
-})
+)
 
 const getUsers = async () => {
     try {
@@ -175,7 +192,7 @@ onMounted(() => getUsers())
 
 <template>
     <transition name="fade">
-        <div v-if="guardando || cargando" class="fixed inset-0 flex items-center justify-center bg-black/50 z-[9999]">
+        <div v-if="guardando || cargando" class="fixed inset-0 flex items-center justify-center bg-white z-[9999]">
             <div ref="loaderContainer" class="w-[200px] h-[200px]"></div>
         </div>
     </transition>
