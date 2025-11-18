@@ -8,9 +8,11 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\UserController;
 
 Route::get('/users', [UserController::class, 'index']);
+Route::get('/users/erased_users', [UserController::class, 'erased_users']);
 Route::post('/users/store', [UserController::class, 'store']);
 Route::post('/users/update/{id}', [UserController::class, 'update']);
 Route::delete('/users/{id}', [UserController::class, 'destroy']);
+Route::post('/users/restore_users/{id}', [UserController::class, 'restore_users']);
 Route::post('register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/sorteos', [SorteoController::class, 'index']);
