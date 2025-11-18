@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginBonos from '../views/Login.vue'
-import DashboardView from '../views/DashboardView.vue'
+import Sorteo from '../views/SorteoView.vue'
+import Usuario from '../views/UsuarioView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -13,11 +14,23 @@ const router = createRouter({
     },
 
     {
-      path: '/dashboard',
-      name: 'dashboard',
-      component: DashboardView,
+      path: '/sorteo',
+      name: 'sorteo',
+      component: Sorteo,
       meta: { requiresAuth: true },
     },
+    {
+      path: '/usuarios',
+      name: 'usuarios',
+      component: Usuario,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('@/views/NotFound.vue')
+    }
+    
   ],
 })
 
@@ -30,7 +43,7 @@ router.beforeEach((to, from, next) => {
     })
   }else if(to.path === '/' && token){
     next({
-      path: '/dashboard', replace: true 
+      path: '/sorteo', replace: true 
     })
   }else{
     next()
