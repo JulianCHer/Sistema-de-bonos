@@ -1,9 +1,10 @@
 <script setup>
 import bgImage from '@/assets/login_image.jpeg'
+import logotipo from '../assets/Logotipo.png'
 import { ref } from 'vue'
 import axios from 'axios'
 import api from '../axios.js'
-import { UserIcon, LockIcon, Eye, EyeOff } from 'lucide-vue-next'
+import { Eye, EyeOff } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -26,12 +27,11 @@ const handleLogin = async () => {
     })
 
     if (response.data.user) {
-      console.log(response.data);
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.user))
       localStorage.setItem('id_group', JSON.stringify(response.data.user.id_group))
 
-      router.push('/dashboard')
+      router.push('/sorteo')
     } else {
       errorMessage.value = 'Error: Respuesta inesperada del servidor.'
     }
@@ -71,7 +71,7 @@ const handleLogin = async () => {
     <div
       class="right_panel w-1/2 flex flex-col items-center justify-center rounded-tl-[25px] rounded-bl-[25px] border-l border-l-[#74737326] ">
       <div class="form_container flex flex-col items-center justify-center min-h-screen shadow-lg rounded-2xl p-8 w-full">
-        <img class="image_title w-[50%]" src="../assets/Logotipo.png"></img>
+        <img class="image_title w-[50%]" :src="logotipo"></img>
 
         <form action="#" method="post" class="flex flex-col h-[40%] w-[70%] justify-evenly">
           <div class="user mb-5">
