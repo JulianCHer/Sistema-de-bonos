@@ -17,7 +17,9 @@ class UserController extends Controller
                 $perPage = 10;
             }
 
-            $users = DB::table('users')
+            $search = trim($request->input('search', ''));
+
+            $usersQuery = DB::table('users')
                 ->leftJoin('user_group', 'users.id_group', '=', 'user_group.Id')
                 ->select(
                     'users.id',
@@ -32,7 +34,17 @@ class UserController extends Controller
                     'users.email',
                     'user_group.Name as group_name'
                 )
-                ->where('users.State', 'Active')
+                ->where('users.State', 'Active');
+
+            if ($search !== '') {
+                $usersQuery->where(function ($query) use ($search) {
+                    $query->where('users.name', 'like', '%' . $search . '%')
+                        ->orWhere('users.surname', 'like', '%' . $search . '%')
+                        ->orWhere('users.document', 'like', '%' . $search . '%');
+                });
+            }
+
+            $users = $usersQuery
                 ->orderBy('users.id', 'asc')
                 ->paginate($perPage);
 

@@ -73,7 +73,7 @@ const handleLogin = async () => {
       <div class="form_container flex flex-col items-center justify-center min-h-screen shadow-lg rounded-2xl p-8 w-full">
         <img class="image_title w-[50%]" :src="logotipo"></img>
 
-        <form action="#" method="post" class="flex flex-col h-[40%] w-[70%] justify-evenly">
+        <form action="#" method="post" class="flex flex-col h-[40%] w-[70%] justify-evenly" @submit.prevent="handleLogin">
           <div class="user mb-5">
             <label for="email" class="block text-gray-600 text-sm mb-2">Correo</label>
             <input v-model="email" type="text" id="email" name="email" placeholder="correo" required
@@ -112,8 +112,7 @@ const handleLogin = async () => {
             <a href="#" class="text-indigo-500 text-blue w-[50%]">Olvidaste la contraseña?</a>
           </div>
           <button
-            type="button"
-            @click="handleLogin"
+            type="submit"
             :disabled="loading"
             class="w-full bg-indigo-500 text-white font-semibold py-3 rounded-xl hover:bg-indigo-600 transition-all"
           >
