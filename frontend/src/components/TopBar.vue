@@ -46,7 +46,7 @@ onMounted(loadUser)
         class="top_bar_greeting text-[20px] font-bold transition-colors"
         :class="[darkMode ? 'text-[#f3f6ff]' : 'text-[#283F69]']"
       >
-        {{ loadingUser ? 'Cargando usuario...' : `Hola, ${greetingName}` }}
+        {{ loadingUser ? 'Cargando usuario...' : `Hola soy, ${greetingName}` }}
       </p>
     </div>
     <div
