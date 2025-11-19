@@ -1,24 +1,28 @@
-<script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+﻿<script setup>
+import { ref, onMounted, watch, nextTick, computed } from 'vue'
 import api from '@/axios'
 import Swal from 'sweetalert2'
 import { SquarePen, Trash2, Camera } from 'lucide-vue-next'
 import imagotipo from '@/assets/user.png'
 import loading from '@/assets/loading.json'
 import lottie from 'lottie-web'
+import TopBar from '@/components/TopBar.vue'
 
 const props = defineProps({
     darkMode: Boolean
 })
 
 const users = ref([])
+const searchTerm = ref('')
 const New_User = ref(false)
 const cargando = ref(false)
 const guardando = ref(false)
 const editando = ref(false)
 const previewImage = ref(null)
 const loaderContainer = ref(null)
+const tableLoaderContainer = ref(null)
 let loaderAnimation = null
+let tableLoaderAnimation = null
 const selectedUserId = ref(null)
 const deletedUsers = ref([])
 const showDeletedModal = ref(false)
@@ -31,6 +35,40 @@ const pagination = ref({
     last_page: 1,
     per_page: 10,
     total: 0
+})
+const visiblePages = computed(() => {
+    const total = pagination.value.last_page || 1
+    const current = currentPage.value || 1
+    const pages = []
+
+    if (total <= 7) {
+        for (let i = 1; i <= total; i++) {
+            pages.push({ type: 'page', value: i })
+        }
+        return pages
+    }
+
+    const addPage = (number) => pages.push({ type: 'page', value: number })
+
+    addPage(1)
+
+    if (current > 4) {
+        pages.push({ type: 'ellipsis', value: 'left' })
+    }
+
+    const start = Math.max(2, current - 1)
+    const end = Math.min(total - 1, current + 1)
+
+    for (let i = start; i <= end; i++) {
+        addPage(i)
+    }
+
+    if (current < total - 3) {
+        pages.push({ type: 'ellipsis', value: 'right' })
+    }
+
+    addPage(total)
+    return pages
 })
 
 
@@ -47,33 +85,55 @@ const newUser = ref({
     avatar: null
 })
 
-watch(
-    () => guardando.value || cargando.value,
-    async (isLoading) => {
-        if (!isLoading) {
-            if (loaderAnimation) {
-                loaderAnimation.destroy()
-                loaderAnimation = null
-            }
-            return
+watch(guardando, async (isLoading) => {
+    if (!isLoading) {
+        if (loaderAnimation) {
+            loaderAnimation.destroy()
+            loaderAnimation = null
         }
-
-        await nextTick()
-
-        if (loaderContainer.value) {
-            if (loaderAnimation) {
-                loaderAnimation.destroy()
-            }
-            loaderAnimation = lottie.loadAnimation({
-                container: loaderContainer.value,
-                renderer: 'svg',
-                loop: true,
-                autoplay: true,
-                animationData: loading
-            })
-        }
+        return
     }
-)
+
+    await nextTick()
+
+    if (loaderContainer.value) {
+        if (loaderAnimation) {
+            loaderAnimation.destroy()
+        }
+        loaderAnimation = lottie.loadAnimation({
+            container: loaderContainer.value,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData: loading
+        })
+    }
+})
+
+watch(cargando, async (isLoading) => {
+    if (!isLoading) {
+        if (tableLoaderAnimation) {
+            tableLoaderAnimation.destroy()
+            tableLoaderAnimation = null
+        }
+        return
+    }
+
+    await nextTick()
+
+    if (tableLoaderContainer.value) {
+        if (tableLoaderAnimation) {
+            tableLoaderAnimation.destroy()
+        }
+        tableLoaderAnimation = lottie.loadAnimation({
+            container: tableLoaderContainer.value,
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            animationData: loading
+        })
+    }
+})
 
 const getUsers = async (page = currentPage.value) => {
     try {
@@ -81,7 +141,8 @@ const getUsers = async (page = currentPage.value) => {
         const response = await api.get('/users', {
             params: {
                 page,
-                per_page: perPage.value
+                per_page: perPage.value,
+                search: searchTerm.value || undefined
             }
         })
         users.value = response.data.users || []
@@ -123,6 +184,16 @@ const abrirModalEliminados = async () => {
 }
 
 const handlePerPageChange = () => {
+    getUsers(1)
+}
+
+const searchUsers = () => {
+    getUsers(1)
+}
+
+const clearSearch = () => {
+    if (!searchTerm.value) return
+    searchTerm.value = ''
     getUsers(1)
 }
 
@@ -230,7 +301,7 @@ const eliminarUsuario = async (id) => {
 const restaurarUsuario = async (id) => {
     const confirm = await Swal.fire({
         title: '¿Restaurar usuario?',
-        text: 'El usuario volverá a estar activo',
+        text: 'El usuario volvera a estar activo',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, restaurar',
@@ -280,13 +351,23 @@ const editarUsuario = (user) => {
     previewImage.value = user.img_url ? `http://127.0.0.1:8000/${user.img_url}` : imagotipo
 }
 
-onMounted(() => getUsers())
+onMounted(() => {
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+        try {
+            currentUser.value = JSON.parse(storedUser)
+        } catch (error) {
+            console.error('No se pudo leer el usuario almacenado', error)
+        }
+    }
+    getUsers()
+})
 
 </script>
 
 <template>
     <transition name="fade">
-        <div v-if="guardando || cargando" class="fixed inset-0 flex items-center justify-center bg-white z-[9999]">
+        <div v-if="guardando" class="fixed inset-0 flex items-center justify-center bg-white z-[9999]">
             <div ref="loaderContainer" class="w-[200px] h-[200px]"></div>
         </div>
     </transition>
@@ -320,7 +401,7 @@ onMounted(() => getUsers())
                 </div>
 
                 <!-- 🔹 Formulario -->
-                <form @submit.prevent="saveUser" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left px-[5%]">
+                <form @submit.prevent="saveUser" @keydown.enter.prevent="saveUser" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left px-[5%]">
                     <div v-for="field in [
                         {label:'Nombre *', model:'nombre', type:'text', placeholder:'Nombre'},
                         {label:'Apellido *', model:'apellido', type:'text', placeholder:'Apellido'},
@@ -446,8 +527,10 @@ onMounted(() => getUsers())
             </div>
         </div>
     </transition>
-
-    <div class="total_section w-[85%] py-[2%] flex flex-col align-items-center">
+    <div class="total_section w-[85%] flex flex-col align-items-center">
+        <div class="w-full">
+            <TopBar :darkMode="darkMode" />
+        </div>
         <!-- 🔹 Botón Nuevo usuario -->
         <div class="button_section flex flex-wrap gap-3 justify-end p-[2%] w-[100%] mb-4">
             <button class="border border-[#283F69] px-4 py-2 rounded
@@ -464,15 +547,28 @@ onMounted(() => getUsers())
         <hr class="w-[100%] text-center opacity-10 py-[1%]" />
 
         <div class="user_content px-[2%]">
-            <h1 class="text-[30px] uppercase font-bold mb-4" :class="[
-                darkMode ? 'text-white' : 'text-[#283F69]',
-            ]">
-                Listado de usuarios
-            </h1>
+            <div class="filters_wrapper flex flex-col lg:flex-row items-stretch w-full gap-3 !mb-4">
+                <div class="lg:w-1/2 w-full">
+                    <input v-model="searchTerm" type="text" placeholder="Buscar por nombre o documento" @keyup.enter="searchUsers"
+                        class="w-full border rounded px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#283F69] dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        :class="[darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-800']" />
+                </div>
+                <div class="flex gap-2">
+                    <button class="px-4 py-2 rounded text-sm font-semibold transition-all"
+                        :class="[darkMode ? 'bg-white text-[#283F69]' : 'bg-[#283F69] text-white']" @click="searchUsers">
+                        Buscar
+                    </button>
+                    <button v-if="searchTerm" class="px-4 py-2 rounded text-sm font-semibold border transition-all"
+                        :class="[darkMode ? 'text-white border-white hover:bg-white hover:text-[#283F69]' : 'text-[#283F69] border-[#283F69] hover:bg-[#283F69] hover:text-white']"
+                        @click="clearSearch">
+                        Limpiar
+                    </button>
+                </div>
+            </div>
 
             <div class="flex flex-wrap justify-between items-center !mb-4 gap-4">
                 <div class="flex items-center gap-2 text-sm">
-                    <label :class="[darkMode ? 'text-white' : 'text-[#283F69]']">Registros por página:</label>
+                    <label :class="[darkMode ? 'text-white' : 'text-[#283F69]']">Registros por pagina:</label>
                     <select v-model.number="perPage" @change="handlePerPageChange"
                         class="border border-gray-300 rounded px-3 py-2 text-sm  dark:text-white dark:bg-gray-700 dark:border-gray-600"
                         :class="[
@@ -484,12 +580,12 @@ onMounted(() => getUsers())
                     </select>
                 </div>
                 <div class="text-sm" :class="[darkMode ? 'text-white' : 'text-[#283F69]']">
-                    Página {{ pagination.current_page }} de {{ pagination.last_page }} — Total: {{ pagination.total }}
+                    Pagina {{ pagination.current_page }} de {{ pagination.last_page }} — Total: {{ pagination.total }}
                 </div>
             </div>
 
-            <div v-if="cargando" class="text-gray-500 text-center py-10 text-lg">
-                Cargando usuarios...
+            <div v-if="cargando" class="flex justify-center py-10">
+                <div ref="tableLoaderContainer" class="w-[150px] h-[150px]"></div>
             </div>
 
             <div v-else class="overflow-x-auto rounded-lg">
@@ -500,15 +596,15 @@ onMounted(() => getUsers())
                         darkMode ? '!bg-white text-[#283F69]' : 'bg-[#283F69] text-white',
                     ]">
                         <tr>
-                            <th class="px-4 py-3 text-center text-[20px] !font-semibold">#</th>
-                            <th class="px-4 py-3 text-center text-[20px] !font-semibold">Nombre</th>
-                            <th class="px-4 py-3 text-center text-[20px] !font-semibold">Email</th>
-                            <th class="px-4 py-3 text-center text-[20px] !font-semibold">Teléfono</th>
-                            <th class="px-4 py-3 text-center text-[20px] !font-semibold">Documento</th>
-                            <th class="px-4 py-3 text-center text-[20px] !font-semibold">
+                            <th class="px-4 py-3 text-center text-[15px] !font-semibold">#</th>
+                            <th class="px-4 py-3 text-center text-[15px] !font-semibold">Nombre</th>
+                            <th class="px-4 py-3 text-center text-[15px] !font-semibold">Email</th>
+                            <th class="px-4 py-3 text-center text-[15px] !font-semibold">Teléfono</th>
+                            <th class="px-4 py-3 text-center text-[15px] !font-semibold">Documento</th>
+                            <th class="px-4 py-3 text-center text-[15px] !font-semibold">
                                 Grupo de usuario
                             </th>
-                            <th class="px-4 py-3 text-center text-[20px] !font-semibold">
+                            <th class="px-4 py-3 text-center text-[15px] !font-semibold">
                                 Acciones
                             </th>
                         </tr>
@@ -527,49 +623,50 @@ onMounted(() => getUsers())
                             class=" dark:hover:bg-gray-700 transition" :class="[
                                 darkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-100',
                             ]">
-                            <td class="p-[1%] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
+                            <td class="p-[5px] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
                                 darkMode ? 'text-white' : 'text-[#283F69]',
                             ]">
                                 {{ index + 1 }}
                             </td>
-                            <td class="p-[1%] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
+                            <td class="p-[5px] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
                                 darkMode ? 'text-white' : 'text-[#283F69]',
                             ]">
                                 {{ user.name }} {{ user.surname }}
                             </td>
-                            <td class="p-[1%] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
+                            <td class="p-[5px] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
                                 darkMode ? 'text-white' : 'text-[#283F69]',
                             ]">
                                 {{ user.email }}
                             </td>
-                            <td class="p-[1%] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
+                            <td class="p-[5px] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
                                 darkMode ? 'text-white' : 'text-[#283F69]',
                             ]">
                                 {{ user.phone }}
                             </td>
-                            <td class="p-[1%] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
+                            <td class="p-[5px] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
                                 darkMode ? 'text-white' : 'text-[#283F69]',
                             ]">
                                 <strong class="uppercase text-[17px]">{{ user.type_document }} - </strong> {{
                                     user.document }}
                             </td>
-                            <td class="p-[1%] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
+                            <td class="p-[5px] text-[15px] text-gray-800 dark:text-gray-200 text-center" :class="[
                                 darkMode ? 'text-white' : 'text-[#283F69]',
                             ]">
                                 {{ user.group_name || 'Sin grupo' }}
                             </td>
-                            <td class="p-[1%] text-center flex justify-around w-[100%] items-center">
-                                <button class="bg-blue-600 text-white font-bold flex items-center gap-2 p-[2%] rounded 
-                                    transition-all duration-300 ease-in-out transform hover:scale-105
-                                    hover:bg-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mx-2"
+                            <td class="p-[5px] text-center flex justify-around w-[100%] items-center">
+                                <button class="w-[45%] font-bold flex items-center justify-center
+                                    transition-all duration-300 ease-in-out transform hover:scale-105"
+                                    :class="[
+                                        darkMode ? 'bg-white text-[#283F69]' : 'bg-[#283F69] text-white'
+                                    ]"
                                     @click="editarUsuario(user)" title="Editar">
                                     Editar
                                     <SquarePen class="w-6 h-6" />
                                 </button>
 
-                                <button class="bg-red-600 text-white font-bold flex items-center gap-2 p-[2%] rounded 
-                                    transition-all duration-300 ease-in-out transform hover:scale-105
-                                    hover:bg-red-700 dark:text-red-400 dark:hover:text-red-300 mx-2"
+                                <button class="bg-red-700 text-white font-bold flex items-center justify-center
+                                    transition-all duration-300 w-[45%] ease-in-out transform hover:scale-105"
                                     @click="eliminarUsuario(user.id)" title="Eliminar">
                                     Eliminar
                                     <Trash2 class="w-6 h-6" />
@@ -578,20 +675,40 @@ onMounted(() => getUsers())
                         </tr>
                     </tbody>
                 </table>
-                <div class="flex flex-wrap justify-between items-center !mt-4 gap-4">
-                    <span class="text-sm" :class="[darkMode ? 'text-white' : 'text-[#283F69]']">
-                        Mostrando página {{ pagination.current_page }} de {{ pagination.last_page }}
-                    </span>
-                    <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center justify-between p-4">
+                    <div class="flex-1 flex justify-start">
                         <button @click="prevPage" :disabled="currentPage <= 1"
-                            class="px-4 py-2 border rounded transition-all"
-                            :class="[currentPage <= 1 ? 'text-gray-400 border-gray-300 cursor-not-allowed' : 'text-[#283F69] border-[#283F69] hover:bg-[#283F69] hover:text-white']">
-                            Anterior
+                            class="px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-1 transition-all border"
+                            :class="[currentPage <= 1
+                                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
+                                : 'text-[#283F69] border-[#dfe3f0] hover:bg-[#283F69] hover:text-white']">
+                            ‹ Previous
                         </button>
+                    </div>
+                    <div class="flex-1 flex justify-center">
+                        <div class="flex items-center gap-2 flex-wrap justify-center">
+                            <template v-for="item in visiblePages" :key="`page-${item.value}-${item.type}`">
+                                <button v-if="item.type === 'page'"
+                                    class="w-10 h-10 rounded-full text-sm font-semibold transition-all border flex items-center justify-center"
+                                    :class="[currentPage === item.value
+                                        ? 'bg-[#283F69] text-white border-[#283F69] shadow-lg'
+                                        : darkMode
+                                            ? 'text-white border-gray-600 hover:bg-white hover:text-[#283F69]'
+                                            : 'text-[#283F69] border-[#dfe3f0] hover:bg-[#283F69] hover:text-white']"
+                                    @click="goToPage(item.value)">
+                                    {{ String(item.value).padStart(2, '0') }}
+                                </button>
+                                <span v-else class="px-2 text-gray-400 select-none">...</span>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="flex-1 flex justify-end">
                         <button @click="nextPage" :disabled="currentPage >= pagination.last_page"
-                            class="px-4 py-2 border rounded transition-all"
-                            :class="[currentPage >= pagination.last_page ? 'text-gray-400 border-gray-300 cursor-not-allowed' : 'text-[#283F69] border-[#283F69] hover:bg-[#283F69] hover:text-white']">
-                            Siguiente
+                            class="px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-1 transition-all border"
+                            :class="[currentPage >= pagination.last_page
+                                ? 'text-gray-400 border-gray-200 cursor-not-allowed'
+                                : 'text-[#283F69] border-[#dfe3f0] hover:bg-[#283F69] hover:text-white']">
+                            Next ›
                         </button>
                     </div>
                 </div>
@@ -610,4 +727,58 @@ onMounted(() => getUsers())
 .fade-leave-to {
     opacity: 0;
 }
+
+.button_section button {
+    min-width: 180px;
+}
+
+.filters_wrapper input {
+    min-height: 45px;
+}
+
+@media (max-width: 1200px) {
+    .total_section {
+        width: 100% !important;
+        padding: 1rem !important;
+    }
+
+    .button_section {
+        justify-content: center !important;
+    }
+}
+
+@media (max-width: 992px) {
+    .button_section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .button_section button {
+        width: 100%;
+    }
+
+    .user_content table th,
+    .user_content table td {
+        font-size: 0.9rem;
+        padding: 0.65rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .filters_wrapper {
+        flex-direction: column !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .button_section {
+        padding: 0 !important;
+    }
+
+    .user_content table th,
+    .user_content table td {
+        font-size: 0.85rem;
+    }
+}
+
 </style>

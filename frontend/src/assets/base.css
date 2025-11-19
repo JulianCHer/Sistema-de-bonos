@@ -34,6 +34,10 @@
   --color-text: var(--vt-c-text-light-1);
 
   --section-gap: 160px;
+
+  --app-text-light: #283F69;
+  --app-text-dark: #ffffff;
+  --app-dark-background: var(--color-gray-800, #1f2937);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -60,7 +64,7 @@
 
 body {
   min-height: 100vh;
-  color: var(--color-text);
+  color: var(--app-text-light);
   background: var(--color-background);
   transition:
     color 0.5s,
@@ -83,4 +87,9 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body {
+  background-color: var(--app-dark-background);
+  color: var(--app-text-dark);
 }
