@@ -4,10 +4,16 @@
 
 body{
     font-family: 'Montserrat', sans-serif;
+    font-size: 15px;
 }
 
 body h1{
   font-weight: bold;
+}
+
+button{
+  padding: 5px;
+  border-radius: 10px;
 }
 
 #app {

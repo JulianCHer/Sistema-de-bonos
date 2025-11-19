@@ -9,7 +9,65 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
+    {
+        try {
+            $perPage = (int) $request->input('per_page', 10);
+            if ($perPage <= 0) {
+                $perPage = 10;
+            }
+
+            $search = trim($request->input('search', ''));
+
+            $usersQuery = DB::table('users')
+                ->leftJoin('user_group', 'users.id_group', '=', 'user_group.Id')
+                ->select(
+                    'users.id',
+                    'users.name',
+                    'users.surname',
+                    'users.id_group',
+                    'users.phone',
+                    'users.address',
+                    'users.img_url',
+                    'users.document',
+                    'users.type_document',
+                    'users.email',
+                    'user_group.Name as group_name'
+                )
+                ->where('users.State', 'Active');
+
+            if ($search !== '') {
+                $usersQuery->where(function ($query) use ($search) {
+                    $query->where('users.name', 'like', '%' . $search . '%')
+                        ->orWhere('users.surname', 'like', '%' . $search . '%')
+                        ->orWhere('users.document', 'like', '%' . $search . '%');
+                });
+            }
+
+            $users = $usersQuery
+                ->orderBy('users.id', 'asc')
+                ->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'users' => $users->items(),
+                'pagination' => [
+                    'current_page' => $users->currentPage(),
+                    'last_page' => $users->lastPage(),
+                    'per_page' => $users->perPage(),
+                    'total' => $users->total()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener los usuarios',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function erased_users()
     {
         try {
             $users = DB::table('users')
@@ -27,7 +85,7 @@ class UserController extends Controller
                     'users.email',
                     'user_group.Name as group_name'
                 )
-                ->where('users.State', 'Active')
+                ->where('users.State', 'Erased')
                 ->orderBy('users.id', 'asc')
                 ->get();
 
@@ -38,7 +96,7 @@ class UserController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al obtener los usuarios',
+                'message' => 'Error al obtener los usuarios eliminados',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -205,6 +263,35 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al eliminar usuario',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function restore_users($id)
+    {
+        try {
+            $user = DB::table('users')->where('id', $id)->first();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuario no encontrado',
+                ], 404);
+            }
+
+            DB::table('users')->where('id', $id)->update([
+                'State'      => 'Active',
+                'updated_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario restaurado correctamente',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al restaurar usuario',
                 'error'   => $e->getMessage(),
             ], 500);
         }
